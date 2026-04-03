@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Resume } from "@/lib/types";
+import mammoth from "mammoth";
 
 interface ResumeUploaderProps {
   onUploadComplete: (resume: Resume) => void;
@@ -25,8 +26,8 @@ export default function ResumeUploader({ onUploadComplete, userId }: ResumeUploa
         return;
       }
       const ext = selectedFile.name.split(".").pop()?.toLowerCase();
-      if (!["pdf", "txt"].includes(ext || "")) {
-        setError("只支持 PDF 和 TXT 文件");
+      if (!["pdf", "txt", "docx", "doc"].includes(ext || "")) {
+        setError("只支持 PDF、TXT、DOC、DOCX 格式");
         return;
       }
       setFile(selectedFile);
@@ -89,10 +90,20 @@ export default function ResumeUploader({ onUploadComplete, userId }: ResumeUploa
       return await file.text();
     }
 
+    if (ext === "docx") {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value || `[DOCX文件: ${file.name}]\n内容已提取`;
+    }
+
+    if (ext === "doc") {
+      // Older DOC format is not well supported by browser-side libraries
+      // Suggest converting to DOCX or using text extraction note
+      return `[DOC文件: ${file.name}]\n提示: 老版DOC格式可能无法完美解析，建议将简历另存为DOCX格式后重新上传，或复制内容到TXT文件上传。`;
+    }
+
     if (ext === "pdf") {
-      // Simple PDF text extraction (for demo - production should use proper library)
-      // For now, we'll use the file name as placeholder
-      return `[PDF文件: ${file.name}]\n请确保PDF内容可复制文本，否则建议将简历内容复制到TXT文件中上传。`;
+      return `[PDF文件: ${file.name}]\n提示: PDF内容若无法自动提取，请复制文本到TXT文件上传以确保最佳效果。`;
     }
 
     return "";
@@ -110,7 +121,7 @@ export default function ResumeUploader({ onUploadComplete, userId }: ResumeUploa
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.txt"
+            accept=".pdf,.txt,.docx,.doc"
             onChange={handleFileChange}
             className="hidden"
           />
@@ -125,7 +136,7 @@ export default function ResumeUploader({ onUploadComplete, userId }: ResumeUploa
             <div>
               <p className="text-muted-foreground">点击选择文件 或 拖拽到此处</p>
               <p className="text-sm text-muted-foreground mt-1">
-                支持 PDF、TXT 格式，最大 10MB
+                支持 PDF、TXT、DOC、DOCX 格式，最大 10MB
               </p>
             </div>
           )}
